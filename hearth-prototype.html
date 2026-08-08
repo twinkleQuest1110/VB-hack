@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hearth — Local Voice Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#12161d;
+    --panel:#191f29;
+    --panel-2:#1f2733;
+    --line:#2a3341;
+    --paper:#e9e7e0;
+    --muted:#8892a0;
+    --amber:#e8a33d;
+    --amber-dim:#5c4622;
+    --mint:#4fd1ae;
+    --mint-dim:#1c3a33;
+    --danger:#e2685b;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -10%, #1c2432 0%, transparent 60%),
+      radial-gradient(ellipse 700px 500px at 100% 10%, #1a2e2a 0%, transparent 55%),
+      var(--ink);
+    color:var(--paper);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    padding:28px 28px 60px;
+  }
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .display{font-family:'Space Grotesk',sans-serif;}
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:26px; flex-wrap:wrap; gap:14px;
+  }
+  .brand{display:flex; align-items:center; gap:12px;}
+  .brand-mark{
+    width:38px;height:38px;border-radius:10px;
+    background:linear-gradient(150deg,var(--amber),#c97f22);
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 0 1px #00000030, 0 6px 16px -6px rgba(232,163,61,0.5);
+  }
+  .brand-mark svg{width:20px;height:20px;}
+  .brand-text .name{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:20px;letter-spacing:0.2px;}
+  .brand-text .tag{font-size:12px;color:var(--muted);margin-top:1px;}
+
+  .privacy-pill{
+    display:flex;align-items:center;gap:9px;
+    background:var(--mint-dim);
+    border:1px solid #2b5a4d;
+    color:var(--mint);
+    padding:8px 14px 8px 10px;border-radius:999px;
+    font-size:12.5px;font-weight:500;
+  }
+  .privacy-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--mint);box-shadow:0 0 0 3px rgba(79,209,174,0.18);}
+  .privacy-pill b{color:var(--paper);font-family:'IBM Plex Mono',monospace;}
+
+  /* ---------- layout ---------- */
+  .grid{
+    display:grid;
+    grid-template-columns: 1.15fr 1fr;
+    gap:20px;
+    max-width:1240px;
+    margin:0 auto;
+  }
+  @media (max-width: 980px){ .grid{grid-template-columns:1fr;} }
+
+  .card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:20px;
+  }
+  .card h2{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:14px; font-weight:600; letter-spacing:0.3px;
+    margin:0 0 4px; color:var(--paper);
+    display:flex;align-items:center;gap:8px;
+  }
+  .card .sub{font-size:12px;color:var(--muted);margin:0 0 16px;}
+
+  /* ---------- voice panel ---------- */
+  .voice-panel{display:flex;flex-direction:column;align-items:center;padding:30px 20px 24px;text-align:center;}
+  .mic-wrap{position:relative;width:132px;height:132px;margin-bottom:18px;}
+  .mic-ring{position:absolute;inset:0;border-radius:50%;border:1px solid var(--line);}
+  .mic-ring.r2{inset:-14px;opacity:0.5;}
+  .mic-ring.r3{inset:-28px;opacity:0.25;}
+  .mic-btn{
+    position:absolute;inset:14px;border-radius:50%;
+    background:linear-gradient(160deg,#232c3a,#1a212b);
+    border:1px solid #333e4e;
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer; transition:transform .15s ease, box-shadow .25s ease, border-color .25s ease;
+    box-shadow:0 10px 24px -10px #000;
+  }
+  .mic-btn:hover{transform:translateY(-2px);}
+  .mic-btn svg{width:34px;height:34px;stroke:var(--paper);transition:stroke .2s;}
+  .mic-btn.listening{
+    background:linear-gradient(160deg,#3a2c14,#241a0a);
+    border-color:var(--amber);
+    box-shadow:0 0 0 6px rgba(232,163,61,0.10), 0 10px 26px -8px rgba(232,163,61,0.45);
+  }
+  .mic-btn.listening svg{stroke:var(--amber);}
+  .pulse{position:absolute;inset:14px;border-radius:50%;border:2px solid var(--amber);opacity:0;pointer-events:none;}
+  .pulse.animate{animation:pulseOut 1.6s ease-out infinite;}
+  @keyframes pulseOut{
+    0%{opacity:.55; transform:scale(1);}
+    100%{opacity:0; transform:scale(1.85);}
+  }
+
+  .mic-status{font-size:13px;color:var(--muted);margin-bottom:14px;min-height:16px;}
+  .mic-status.active{color:var(--amber);font-weight:500;}
+
+  .bars{display:flex;align-items:flex-end;gap:3px;height:28px;margin-bottom:18px;}
+  .bars span{width:4px;border-radius:2px;background:var(--line);height:6px;transition:height .12s ease, background .2s;}
+  .bars.live span{background:var(--amber);}
+
+  .transcript-box{
+    width:100%;
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:14px 16px;
+    min-height:52px;
+    font-size:15px;
+    color:var(--paper);
+    text-align:left;
+    margin-bottom:16px;
+    display:flex;align-items:center;
+  }
+  .transcript-box .placeholder{color:var(--muted);}
+  .transcript-box .cursor{display:inline-block;width:2px;height:16px;background:var(--amber);margin-left:2px;animation:blink 1s step-start infinite;}
+  @keyframes blink{50%{opacity:0;}}
+
+  form.text-fallback{display:flex;gap:8px;width:100%;}
+  form.text-fallback input{
+    flex:1; background:var(--panel-2); border:1px solid var(--line); border-radius:10px;
+    padding:11px 13px; color:var(--paper); font-family:'Inter',sans-serif; font-size:13.5px; outline:none;
+  }
+  form.text-fallback input:focus{border-color:var(--amber);}
+  form.text-fallback button{
+    background:var(--amber); color:#1a1305; border:none; border-radius:10px;
+    padding:0 16px; font-weight:600; font-size:13px; cursor:pointer;
+  }
+  form.text-fallback button:hover{filter:brightness(1.06);}
+
+  .chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px;width:100%;}
+  .chip{
+    font-size:11.5px; color:var(--muted); background:var(--panel-2);
+    border:1px solid var(--line); padding:6px 10px; border-radius:999px;
+    cursor:pointer; transition:all .15s;
+  }
+  .chip:hover{color:var(--paper);border-color:var(--amber);}
+
+  /* ---------- parse card ---------- */
+  .parse-card{margin-top:18px;width:100%;text-align:left;}
+  .parse-empty{font-size:12.5px;color:var(--muted);text-align:center;padding:10px 0 2px;}
+  .parse-row{
+    display:grid; grid-template-columns: 92px 1fr; gap:4px 10px; font-size:12.5px;
+    padding:6px 0; border-bottom:1px dashed #2a3341;
+  }
+  .parse-row:last-child{border-bottom:none;}
+  .parse-row .k{color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:11px;padding-top:1px;}
+  .parse-row .v{color:var(--paper);font-weight:500;}
+  .conf-wrap{display:flex;align-items:center;gap:8px;margin-top:2px;}
+  .conf-bar{flex:1;height:5px;border-radius:3px;background:var(--line);overflow:hidden;}
+  .conf-fill{height:100%;background:linear-gradient(90deg,var(--mint),#7fe6c8);border-radius:3px;transition:width .5s ease;}
+  .conf-num{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--mint);}
+
+  /* ---------- devices ---------- */
+  .room-group{margin-bottom:16px;}
+  .room-group:last-child{margin-bottom:0;}
+  .room-title{
+    font-size:11px; letter-spacing:0.6px; text-transform:uppercase;
+    color:var(--muted); font-family:'IBM Plex Mono',monospace; margin-bottom:8px;
+  }
+  .device-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .device{
+    background:var(--panel-2); border:1px solid var(--line); border-radius:12px;
+    padding:12px 13px; position:relative; overflow:hidden; transition:border-color .2s;
+  }
+  .device.flash{border-color:var(--amber); }
+  .device .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+  .device .icon{
+    width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+    background:var(--line); transition:background .25s;
+  }
+  .device.on .icon{background:var(--amber-dim);}
+  .device .icon svg{width:16px;height:16px;stroke:var(--muted);transition:stroke .25s;}
+  .device.on .icon svg{stroke:var(--amber);}
+  .device .name{font-size:12.5px;font-weight:500;}
+  .device .state{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);}
+  .device.on .state{color:var(--amber);}
+  .toggle{
+    width:32px;height:18px;border-radius:20px;background:var(--line);position:relative;cursor:pointer;flex-shrink:0;
+    transition:background .2s;
+  }
+  .toggle .knob{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#7c8494;transition:all .2s;}
+  .device.on .toggle{background:var(--amber-dim);}
+  .device.on .toggle .knob{left:16px;background:var(--amber);}
+
+  /* ---------- history / log ---------- */
+  .log{max-height:260px;overflow-y:auto;padding-right:2px;}
+  .log::-webkit-scrollbar{width:5px;}
+  .log::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px;}
+  .log-empty{font-size:12.5px;color:var(--muted);text-align:center;padding:18px 0;}
+  .log-item{
+    display:flex; gap:10px; padding:10px 0; border-bottom:1px solid #202836;
+    animation:slideIn .3s ease;
+  }
+  .log-item:last-child{border-bottom:none;}
+  @keyframes slideIn{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
+  .log-time{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--muted);width:52px;flex-shrink:0;padding-top:2px;}
+  .log-body{flex:1;}
+  .log-cmd{font-size:12.5px;color:var(--paper);margin-bottom:2px;}
+  .log-meta{font-size:10.5px;color:var(--muted);display:flex;gap:8px;align-items:center;}
+  .badge{
+    font-family:'IBM Plex Mono',monospace;font-size:9.5px;padding:1px 6px;border-radius:5px;
+    background:var(--mint-dim);color:var(--mint);
+  }
+  .badge.warn{background:#3a2416;color:var(--danger);}
+
+  /* stat row */
+  .stat-row{display:flex;gap:10px;margin-top:16px;}
+  .stat{flex:1;background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:12px 12px;}
+  .stat .num{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;}
+  .stat .lbl{font-size:10.5px;color:var(--muted);margin-top:2px;}
+  .stat.mint .num{color:var(--mint);}
+  .stat.amber .num{color:var(--amber);}
+
+  footer{max-width:1240px;margin:24px auto 0;text-align:center;font-size:11px;color:var(--muted);}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#1a1305" stroke-width="2.2" stroke-linecap="round"><path d="M4 12l8-8 8 8"/><path d="M6 10v9a1 1 0 001 1h10a1 1 0 001-1v-9"/><path d="M10 20v-6h4v6"/></svg>
+    </div>
+    <div class="brand-text">
+      <div class="name">Hearth</div>
+      <div class="tag">Local voice dashboard for smart homes</div>
+    </div>
+  </div>
+  <div class="privacy-pill"><span class="dot"></span> On-device NLU · <b id="netCount">0 bytes</b> sent to the cloud</div>
+</div>
+
+<div class="grid">
+
+  <!-- LEFT: voice + parse -->
+  <div class="card voice-panel">
+    <h2 style="align-self:flex-start;">🎙 Speak or type a command</h2>
+    <p class="sub" style="align-self:flex-start;">Recognition runs in your browser; intent parsing runs entirely in this page's local JS engine — no request ever leaves the device.</p>
+
+    <div class="mic-wrap">
+      <div class="mic-ring"></div>
+      <div class="mic-ring r2"></div>
+      <div class="mic-ring r3"></div>
+      <div class="pulse" id="pulse"></div>
+      <div class="mic-btn" id="micBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+      </div>
+    </div>
+    <div class="mic-status" id="micStatus">Tap the mic, or type a command below</div>
+    <div class="bars" id="bars"></div>
+
+    <div class="transcript-box" id="transcriptBox"><span class="placeholder">Transcript will appear here…</span></div>
+
+    <form class="text-fallback" id="cmdForm">
+      <input type="text" id="cmdInput" placeholder="e.g. dim the kitchen lights to 40 percent" autocomplete="off">
+      <button type="submit">Send</button>
+    </form>
+
+    <div class="chips" id="chips"></div>
+
+    <div class="parse-card">
+      <div id="parseEmpty" class="parse-empty">Parsed intent will show up here — instantly, and only here.</div>
+      <div id="parseResult" style="display:none;">
+        <div class="parse-row"><div class="k">INTENT</div><div class="v" id="pIntent">—</div></div>
+        <div class="parse-row"><div class="k">DEVICE</div><div class="v" id="pDevice">—</div></div>
+        <div class="parse-row"><div class="k">ROOM</div><div class="v" id="pRoom">—</div></div>
+        <div class="parse-row"><div class="k">VALUE</div><div class="v" id="pValue">—</div></div>
+        <div class="parse-row"><div class="k">CONFIDENCE</div><div class="v">
+          <div class="conf-wrap"><div class="conf-bar"><div class="conf-fill" id="confFill" style="width:0%"></div></div><span class="conf-num" id="confNum">0%</span></div>
+        </div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: dashboard -->
+  <div style="display:flex;flex-direction:column;gap:20px;">
+    <div class="card">
+      <h2>🏠 Live device states</h2>
+      <p class="sub">Unified visual feedback — every state below reflects the last parsed command in real time.</p>
+      <div id="rooms"></div>
+      <div class="stat-row">
+        <div class="stat mint"><div class="num" id="statCommands">0</div><div class="lbl">COMMANDS PROCESSED LOCALLY</div></div>
+        <div class="stat amber"><div class="num" id="statAvgConf">—</div><div class="lbl">AVG. CONFIDENCE</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🕓 Command history</h2>
+      <p class="sub">Kept in this session only — nothing is written to a server or a permanent log.</p>
+      <div class="log" id="log"><div class="log-empty">No commands yet this session.</div></div>
+    </div>
+  </div>
+
+</div>
+
+<footer>Prototype demo · Speech-to-text uses your browser's built-in engine when available · Intent parsing, device state, and history are 100% client-side JavaScript</footer>
+
+<script>
+/* ============ DEVICE STATE MODEL ============ */
+const rooms = {
+  living_room: { label:"Living Room", devices:{
+    lights:{ label:"Lights", type:"light", on:false, level:70 },
+    fan:{ label:"Fan", type:"fan", on:false, level:2 },
+    tv:{ label:"TV", type:"tv", on:false },
+  }},
+  bedroom: { label:"Bedroom", devices:{
+    lights:{ label:"Lights", type:"light", on:false, level:50 },
+    thermostat:{ label:"Thermostat", type:"thermostat", on:true, temp:70 },
+  }},
+  kitchen: { label:"Kitchen", devices:{
+    lights:{ label:"Lights", type:"light", on:true, level:90 },
+  }},
+  front_door: { label:"Front Door", devices:{
+    lock:{ label:"Lock", type:"lock", on:true }, // on = locked
+  }},
+};
+
+const roomAliases = {
+  "living room":"living_room", "living":"living_room", "lounge":"living_room",
+  "bedroom":"bedroom", "bed room":"bedroom",
+  "kitchen":"kitchen",
+  "front door":"front_door", "front":"front_door", "door":"front_door", "entrance":"front_door",
+};
+const deviceAliases = {
+  "light":"lights","lights":"lights","lamp":"lights",
+  "fan":"fan",
+  "tv":"tv","television":"tv",
+  "thermostat":"thermostat","temperature":"thermostat","temp":"thermostat","heater":"thermostat","ac":"thermostat","air conditioning":"thermostat",
+  "lock":"lock","door lock":"lock",
+};
+
+const icons = {
+  light:'<path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a6 6 0 00-4 10.5c.6.6 1 1.4 1 2.5h6c0-1.1.4-1.9 1-2.5A6 6 0 0012 2z"/>',
+  fan:'<circle cx="12" cy="12" r="1.5"/><path d="M12 12c0-3 2-6 5-6s2 4-1 5"/><path d="M12 12c-3 0-6 2-6 5s4 2 5-1"/><path d="M12 12c3 0 6-2 6-5s-4-2-5 1"/><path d="M12 12c0 3-2 6-5 6s-2-4 1-5"/>',
+  tv:'<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M9 21h6"/><path d="M12 17v4"/>',
+  thermostat:'<circle cx="12" cy="14" r="5"/><path d="M12 9V4"/><circle cx="12" cy="14" r="1.6"/>',
+  lock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>',
+};
+
+/* ============ NLU ENGINE (fully local) ============ */
+function stripFiller(s){
+  return s.toLowerCase()
+    .replace(/[.?!]/g,"")
+    .replace(/\bplease\b|\bcould you\b|\bcan you\b|\bhey hearth\b|\bhearth\b/g,"")
+    .trim();
+}
+
+function parseCommand(raw){
+  const text = stripFiller(raw);
+  let intent = null, deviceKey = null, roomKey = null, value = null;
+  let score = 0, maxScore = 4;
+
+  // room
+  for (const alias in roomAliases){
+    if (text.includes(alias)){ roomKey = roomAliases[alias]; score++; break; }
+  }
+  // device
+  for (const alias in deviceAliases){
+    if (text.includes(alias)){ deviceKey = deviceAliases[alias]; score++; break; }
+  }
+  // percentage / number value
+  const pctMatch = text.match(/(\d{1,3})\s*(percent|%)/);
+  const numMatch = text.match(/\b(\d{2,3})\b/);
+  const degMatch = text.match(/(\d{2,3})\s*(degrees|deg)?/);
+
+  // intent detection
+  if (/\block\b/.test(text) && !/unlock/.test(text)){ intent="lock"; score++; }
+  else if (/unlock/.test(text)){ intent="unlock"; score++; }
+  else if (/turn on|switch on|\bon\b$/.test(text) || (/turn|switch/.test(text) && / on\b/.test(text))){ intent="turn_on"; score++; }
+  else if (/turn off|switch off|\boff\b/.test(text)){ intent="turn_off"; score++; }
+  else if (/dim|brightness|set.*light/.test(text) && pctMatch){ intent="set_brightness"; value=parseInt(pctMatch[1]); score+=2; }
+  else if (/set.*(thermostat|temperature|temp)|degrees/.test(text) && (degMatch||numMatch)){ intent="set_temperature"; value = parseInt((degMatch&&degMatch[1])||(numMatch&&numMatch[1])); score+=2; }
+  else if (/speed/.test(text) && numMatch){ intent="set_fan_speed"; value=parseInt(numMatch[1]); score+=2;}
+  else if (/status|what.?s|how.?s|check/.test(text)){ intent="query_status"; score++; }
+  else if (pctMatch && deviceKey==="lights"){ intent="set_brightness"; value=parseInt(pctMatch[1]); score+=2; }
+  else if ((degMatch||numMatch) && deviceKey==="thermostat"){ intent="set_temperature"; value=parseInt((degMatch&&degMatch[1])||(numMatch&&numMatch[1])); score+=2; }
+
+  if (!deviceKey && intent==="lock"||intent==="unlock") { deviceKey="lock"; roomKey = roomKey||"front_door"; }
+  if (!intent) { score = Math.max(score-1,0); }
+
+  const confidence = Math.min(0.98, Math.max(0.28, score / maxScore));
+  return { raw, intent, deviceKey, roomKey, value, confidence };
+}
+
+/* ============ APPLY TO STATE ============ */
+let commandCount = 0, confSum = 0;
+
+function applyParsed(p){
+  let room = p.roomKey, device = p.deviceKey;
+
+  // infer defaults
+  if (device === "lock") room = room || "front_door";
+  if (device === "thermostat") room = room || "bedroom";
+  if (!room){
+    // pick first room that actually has this device, else living_room
+    for (const rk in rooms){ if (device && rooms[rk].devices[device]){ room = rk; break; } }
+    room = room || "living_room";
+  }
+  if (!device){
+    // if intent implies lock
+    if (p.intent==="lock"||p.intent==="unlock") device="lock";
+    else device = "lights";
+  }
+  if (!rooms[room] || !rooms[room].devices[device]) return null;
+
+  const d = rooms[room].devices[device];
+  let summary = "";
+
+  switch(p.intent){
+    case "turn_on": d.on = true; summary = `${rooms[room].label} ${d.label} turned on`; break;
+    case "turn_off": d.on = false; summary = `${rooms[room].label} ${d.label} turned off`; break;
+    case "lock": d.on = true; summary = `${rooms[room].label} locked`; break;
+    case "unlock": d.on = false; summary = `${rooms[room].label} unlocked`; break;
+    case "set_brightness": d.on = true; d.level = p.value ?? d.level; summary = `${rooms[room].label} lights set to ${d.level}%`; break;
+    case "set_temperature": d.on = true; d.temp = p.value ?? d.temp; summary = `Thermostat set to ${d.temp}°`; break;
+    case "set_fan_speed": d.on = true; d.level = p.value ?? d.level; summary = `${rooms[room].label} fan set to speed ${d.level}`; break;
+    case "query_status": summary = describeState(room, device); break;
+    default: summary = "Command not confidently recognized"; break;
+  }
+  return { room, device, summary };
+}
+
+function describeState(room, device){
+  const d = rooms[room].devices[device];
+  if (d.type==="light") return `${rooms[room].label} lights are ${d.on? "on at "+d.level+"%":"off"}`;
+  if (d.type==="thermostat") return `Thermostat is set to ${d.temp}°`;
+  if (d.type==="lock") return `${rooms[room].label} is ${d.on?"locked":"unlocked"}`;
+  if (d.type==="fan") return `${rooms[room].label} fan is ${d.on? "on (speed "+d.level+")":"off"}`;
+  if (d.type==="tv") return `${rooms[room].label} TV is ${d.on?"on":"off"}`;
+}
+
+/* ============ RENDER ============ */
+const roomsEl = document.getElementById("rooms");
+function renderRooms(flashKey){
+  roomsEl.innerHTML = "";
+  for (const rk in rooms){
+    const r = rooms[rk];
+    const group = document.createElement("div");
+    group.className = "room-group";
+    const title = document.createElement("div");
+    title.className = "room-title";
+    title.textContent = r.label;
+    group.appendChild(title);
+    const grid = document.createElement("div");
+    grid.className = "device-grid";
+    for (const dk in r.devices){
+      const d = r.devices[dk];
+      const el = document.createElement("div");
+      el.className = "device" + (d.on?" on":"") + (flashKey===(rk+"::"+dk)?" flash":"");
+      let stateText = "";
+      if (d.type==="light") stateText = d.on? d.level+"%":"off";
+      else if (d.type==="thermostat") stateText = d.temp+"°";
+      else if (d.type==="lock") stateText = d.on? "locked":"unlocked";
+      else if (d.type==="fan") stateText = d.on? "speed "+d.level:"off";
+      else if (d.type==="tv") stateText = d.on? "on":"off";
+      el.innerHTML = `
+        <div class="top">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${icons[d.type]}</svg></div>
+          <div class="toggle" data-room="${rk}" data-device="${dk}"><div class="knob"></div></div>
+        </div>
+        <div class="name">${d.label}</div>
+        <div class="state">${stateText}</div>
+      `;
+      grid.appendChild(el);
+    }
+    group.appendChild(grid);
+    roomsEl.appendChild(group);
+  }
+  // manual toggle clicks
+  roomsEl.querySelectorAll(".toggle").forEach(t=>{
+    t.addEventListener("click", ()=>{
+      const rk = t.dataset.room, dk = t.dataset.device;
+      rooms[rk].devices[dk].on = !rooms[rk].devices[dk].on;
+      renderRooms();
+    });
+  });
+}
+renderRooms();
+
+/* ============ PARSE CARD ============ */
+function showParse(p){
+  document.getElementById("parseEmpty").style.display = "none";
+  const res = document.getElementById("parseResult");
+  res.style.display = "block";
+  document.getElementById("pIntent").textContent = p.intent ? p.intent.replace(/_/g," ") : "unrecognized";
+  document.getElementById("pDevice").textContent = p.deviceKey || "—";
+  document.getElementById("pRoom").textContent = p.roomKey ? roomAliasLabel(p.roomKey) : "(inferred)";
+  document.getElementById("pValue").textContent = (p.value!==null && p.value!==undefined) ? p.value : "—";
+  const pct = Math.round(p.confidence*100);
+  document.getElementById("confFill").style.width = pct+"%";
+  document.getElementById("confNum").textContent = pct+"%";
+}
+function roomAliasLabel(rk){ return rooms[rk] ? rooms[rk].label : rk; }
+
+/* ============ HISTORY LOG ============ */
+const logEl = document.getElementById("log");
+function addLog(cmdText, p, summary){
+  const empty = logEl.querySelector(".log-empty");
+  if (empty) empty.remove();
+  const item = document.createElement("div");
+  item.className = "log-item";
+  const now = new Date();
+  const time = now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  const pct = Math.round(p.confidence*100);
+  const badgeClass = pct < 45 ? "badge warn" : "badge";
+  item.innerHTML = `
+    <div class="log-time">${time}</div>
+    <div class="log-body">
+      <div class="log-cmd">“${cmdText}”</div>
+      <div class="log-meta"><span class="${badgeClass}">${pct}% conf</span><span>${summary||"—"}</span></div>
+    </div>
+  `;
+  logEl.prepend(item);
+}
+
+/* ============ STATS ============ */
+function updateStats(){
+  document.getElementById("statCommands").textContent = commandCount;
+  document.getElementById("statAvgConf").textContent = commandCount ? Math.round((confSum/commandCount)*100)+"%" : "—";
+  document.getElementById("netCount").textContent = "0 bytes";
+}
+
+/* ============ COMMAND PIPELINE ============ */
+function handleCommand(text){
+  if (!text || !text.trim()) return;
+  const p = parseCommand(text);
+  showParse(p);
+  const result = applyParsed(p);
+  commandCount++; confSum += p.confidence;
+  updateStats();
+  if (result){
+    renderRooms(result.room+"::"+result.device);
+    addLog(text, p, result.summary);
+  } else {
+    addLog(text, p, "Could not map to a known device");
+  }
+}
+
+/* ============ TEXT INPUT ============ */
+const cmdForm = document.getElementById("cmdForm");
+const cmdInput = document.getElementById("cmdInput");
+cmdForm.addEventListener("submit", (e)=>{
+  e.preventDefault();
+  const val = cmdInput.value;
+  if (!val.trim()) return;
+  setTranscript(val);
+  handleCommand(val);
+  cmdInput.value = "";
+});
+
+/* ============ CHIPS ============ */
+const examples = [
+  "Turn on the living room lights",
+  "Set the thermostat to 72",
+  "Lock the front door",
+  "Dim the kitchen lights to 40 percent",
+  "Turn off the bedroom lights",
+  "What's the status of the living room",
+];
+const chipsEl = document.getElementById("chips");
+examples.forEach(ex=>{
+  const c = document.createElement("div");
+  c.className = "chip";
+  c.textContent = ex;
+  c.addEventListener("click", ()=>{
+    setTranscript(ex);
+    handleCommand(ex);
+  });
+  chipsEl.appendChild(c);
+});
+
+/* ============ TRANSCRIPT DISPLAY ============ */
+const transcriptBox = document.getElementById("transcriptBox");
+function setTranscript(text, interim){
+  transcriptBox.innerHTML = "";
+  const span = document.createElement("span");
+  span.textContent = text;
+  transcriptBox.appendChild(span);
+  if (interim){
+    const cur = document.createElement("span");
+    cur.className = "cursor";
+    transcriptBox.appendChild(cur);
+  }
+}
+
+/* ============ MIC / SPEECH RECOGNITION ============ */
+const micBtn = document.getElementById("micBtn");
+const micStatus = document.getElementById("micStatus");
+const pulse = document.getElementById("pulse");
+const barsEl = document.getElementById("bars");
+for (let i=0;i<20;i++){ const s=document.createElement("span"); barsEl.appendChild(s); }
+
+let barsInterval = null;
+function animateBars(on){
+  barsEl.classList.toggle("live", on);
+  clearInterval(barsInterval);
+  if (on){
+    barsInterval = setInterval(()=>{
+      barsEl.querySelectorAll("span").forEach(s=>{
+        s.style.height = (4 + Math.random()*24) + "px";
+      });
+    }, 110);
+  } else {
+    barsEl.querySelectorAll("span").forEach(s=> s.style.height = "6px");
+  }
+}
+
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognizing = false, recognition = null;
+
+if (SR){
+  recognition = new SR();
+  recognition.continuous = false;
+  recognition.interimResults = true;
+  recognition.lang = "en-US";
+
+  recognition.onstart = ()=>{
+    recognizing = true;
+    micBtn.classList.add("listening");
+    pulse.classList.add("animate");
+    micStatus.textContent = "Listening…";
+    micStatus.classList.add("active");
+    animateBars(true);
+  };
+  recognition.onresult = (event)=>{
+    let interim = "", final = "";
+    for (let i=event.resultIndex; i<event.results.length; i++){
+      if (event.results[i].isFinal) final += event.results[i][0].transcript;
+      else interim += event.results[i][0].transcript;
+    }
+    setTranscript(final || interim, !final);
+    if (final) handleCommand(final);
+  };
+  recognition.onerror = (e)=>{
+    micStatus.textContent = "Mic unavailable (" + e.error + ") — try typing instead";
+    micStatus.classList.remove("active");
+  };
+  recognition.onend = ()=>{
+    recognizing = false;
+    micBtn.classList.remove("listening");
+    pulse.classList.remove("animate");
+    animateBars(false);
+    if (micStatus.textContent === "Listening…"){
+      micStatus.textContent = "Tap the mic, or type a command below";
+      micStatus.classList.remove("active");
+    }
+  };
+
+  micBtn.addEventListener("click", ()=>{
+    if (recognizing){ recognition.stop(); return; }
+    try{ recognition.start(); }
+    catch(err){ micStatus.textContent = "Couldn't start mic — try typing instead"; }
+  });
+} else {
+  micStatus.textContent = "Speech recognition not supported here — type a command below";
+  micBtn.addEventListener("click", ()=>{
+    micStatus.textContent = "Speech recognition not supported here — type a command below";
+    cmdInput.focus();
+  });
+}
+
+updateStats();
+</script>
+</body>
+</html>
